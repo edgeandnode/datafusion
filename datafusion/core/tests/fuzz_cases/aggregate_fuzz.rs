@@ -349,6 +349,7 @@ async fn run_aggregate_test(input1: Vec<RecordBatch>, group_by_columns: Vec<&str
             vec![None],
             running_source,
             schema.clone(),
+            None,
         )
         .unwrap(),
     ) as Arc<dyn ExecutionPlan>;
@@ -361,6 +362,7 @@ async fn run_aggregate_test(input1: Vec<RecordBatch>, group_by_columns: Vec<&str
             vec![None],
             usual_source,
             schema.clone(),
+            None,
         )
         .unwrap(),
     ) as Arc<dyn ExecutionPlan>;
@@ -740,6 +742,7 @@ async fn test_single_mode_aggregate_with_spill() -> Result<()> {
         vec![None; aggregate_expressions.len()],
         plan,
         Arc::clone(&scan_schema),
+        None,
     )?);
 
     let memory_pool = Arc::new(FairSpillPool::new(250000));

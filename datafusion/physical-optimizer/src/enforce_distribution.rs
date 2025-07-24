@@ -508,6 +508,7 @@ pub fn reorder_aggregate_keys(
                         agg_exec.filter_expr().to_vec(),
                         Arc::clone(agg_exec.input()),
                         Arc::clone(&agg_exec.input_schema),
+                        None,
                     )?);
                     // Build new group expressions that correspond to the output
                     // of the "reordered" aggregator:
@@ -527,6 +528,7 @@ pub fn reorder_aggregate_keys(
                         agg_exec.filter_expr().to_vec(),
                         Arc::clone(&partial_agg) as _,
                         agg_exec.input_schema(),
+                        None,
                     )?);
 
                     agg_node.plan = Arc::clone(&new_final_agg) as _;

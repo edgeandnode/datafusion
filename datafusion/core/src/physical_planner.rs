@@ -740,6 +740,7 @@ impl DefaultPhysicalPlanner {
                     filters.clone(),
                     input_exec,
                     Arc::clone(&physical_input_schema),
+                    None,
                 )?);
 
                 let can_repartition = !groups.is_empty()
@@ -771,6 +772,7 @@ impl DefaultPhysicalPlanner {
                     filters,
                     initial_aggr,
                     Arc::clone(&physical_input_schema),
+                    None,
                 )?)
             }
             LogicalPlan::Projection(Projection { input, expr, .. }) => self

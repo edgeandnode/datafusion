@@ -17,6 +17,8 @@
 
 //! Aggregates functionalities
 
+pub mod nozzle;
+
 use std::any::Any;
 use std::sync::Arc;
 
@@ -403,6 +405,8 @@ pub struct AggregateExec {
     required_input_ordering: Option<OrderingRequirements>,
     /// Describes how the input is ordered relative to the group by columns
     input_order_mode: InputOrderMode,
+    /// Optional initial aggregate state for Final mode operations
+    initial_state: Option<nozzle::AggregateState>,
     cache: PlanProperties,
 }
 
@@ -428,6 +432,7 @@ impl AggregateExec {
             input: Arc::clone(&self.input),
             schema: Arc::clone(&self.schema),
             input_schema: Arc::clone(&self.input_schema),
+            initial_state: self.initial_state.clone(),
         }
     }
 
@@ -443,6 +448,7 @@ impl AggregateExec {
         filter_expr: Vec<Option<Arc<dyn PhysicalExpr>>>,
         input: Arc<dyn ExecutionPlan>,
         input_schema: SchemaRef,
+        initial_state: Option<nozzle::AggregateState>,
     ) -> Result<Self> {
         let schema = create_schema(&input.schema(), &group_by, &aggr_expr, mode)?;
 
@@ -455,6 +461,7 @@ impl AggregateExec {
             input,
             input_schema,
             schema,
+            initial_state,
         )
     }
 
@@ -475,6 +482,7 @@ impl AggregateExec {
         input: Arc<dyn ExecutionPlan>,
         input_schema: SchemaRef,
         schema: SchemaRef,
+        initial_state: Option<nozzle::AggregateState>,
     ) -> Result<Self> {
         // Make sure arguments are consistent in size
         if aggr_expr.len() != filter_expr.len() {
@@ -540,6 +548,13 @@ impl AggregateExec {
             aggr_expr.as_slice(),
         )?;
 
+        // Validate initial_state parameter
+        if initial_state.is_some() && !matches!(mode, AggregateMode::Final | AggregateMode::Single) {
+            return internal_err!(
+                "Initial state can only be provided for Final or Single mode (single partition)"
+            );
+        }
+
         Ok(AggregateExec {
             mode,
             group_by,
@@ -552,6 +567,7 @@ impl AggregateExec {
             required_input_ordering,
             limit: None,
             input_order_mode,
+            initial_state,
             cache,
         })
     }
@@ -566,6 +582,8 @@ impl AggregateExec {
         self.limit = limit;
         self
     }
+
+
     /// Grouping expressions
     pub fn group_expr(&self) -> &PhysicalGroupBy {
         &self.group_by
@@ -599,6 +617,11 @@ impl AggregateExec {
     /// number of rows soft limit of the AggregateExec
     pub fn limit(&self) -> Option<usize> {
         self.limit
+    }
+
+    /// Initial aggregate state
+    pub fn initial_state(&self) -> &Option<nozzle::AggregateState> {
+        &self.initial_state
     }
 
     fn execute_typed(
@@ -987,6 +1010,7 @@ impl ExecutionPlan for AggregateExec {
             Arc::clone(&children[0]),
             Arc::clone(&self.input_schema),
             Arc::clone(&self.schema),
+            self.initial_state.clone(),
         )?;
         me.limit = self.limit;
 
@@ -1607,6 +1631,7 @@ mod tests {
             vec![None],
             input,
             Arc::clone(&input_schema),
+            None,
         )?);
 
         let result =
@@ -1687,6 +1712,7 @@ mod tests {
             vec![None],
             merge,
             input_schema,
+            None,
         )?);
 
         let result = collect(merged_aggregate.execute(0, Arc::clone(&task_ctx))?).await?;
@@ -1756,6 +1782,7 @@ mod tests {
             vec![None],
             input,
             Arc::clone(&input_schema),
+            None,
         )?);
 
         let result =
@@ -1800,6 +1827,7 @@ mod tests {
             vec![None],
             merge,
             input_schema,
+            None,
         )?);
 
         let task_ctx = if spill {
@@ -2100,6 +2128,7 @@ mod tests {
                 vec![None; n_aggr],
                 Arc::clone(&input),
                 Arc::clone(&input_schema),
+                None,
             )?);
 
             let stream = partial_aggregate.execute_typed(0, Arc::clone(&task_ctx))?;
@@ -2156,6 +2185,7 @@ mod tests {
             vec![None],
             blocking_exec,
             schema,
+            None,
         )?);
 
         let fut = crate::collect(aggregate_exec, task_ctx);
@@ -2195,6 +2225,7 @@ mod tests {
             vec![None],
             blocking_exec,
             schema,
+            None,
         )?);
 
         let fut = crate::collect(aggregate_exec, task_ctx);
@@ -2327,6 +2358,7 @@ mod tests {
             vec![None],
             memory_exec,
             Arc::clone(&schema),
+            None,
         )?);
         let coalesce = if use_coalesce_batches {
             let coalesce = Arc::new(CoalescePartitionsExec::new(aggregate_exec));
@@ -2342,6 +2374,7 @@ mod tests {
             vec![None],
             coalesce,
             schema,
+            None,
         )?) as Arc<dyn ExecutionPlan>;
 
         let result = crate::collect(aggregate_final, task_ctx).await?;
@@ -2474,6 +2507,7 @@ mod tests {
             vec![None, None],
             Arc::clone(&blocking_exec) as Arc<dyn ExecutionPlan>,
             schema,
+            None,
         )?);
         let new_agg =
             Arc::clone(&aggregate_exec).with_new_children(vec![blocking_exec])?;
@@ -2547,6 +2581,7 @@ mod tests {
             vec![None],
             input,
             schema,
+            None,
         )?);
 
         let output =
@@ -2662,6 +2697,7 @@ mod tests {
             vec![None],
             Arc::clone(&input) as Arc<dyn ExecutionPlan>,
             batch.schema(),
+            None,
         )?);
 
         let session_config = SessionConfig::default();
@@ -2729,6 +2765,7 @@ mod tests {
             vec![None],
             Arc::clone(&input) as Arc<dyn ExecutionPlan>,
             schema,
+            None,
         )?);
 
         let mut session_config = SessionConfig::default();
@@ -2817,6 +2854,7 @@ mod tests {
             vec![None],
             Arc::clone(&input) as Arc<dyn ExecutionPlan>,
             schema,
+            None,
         )?);
 
         let mut session_config = SessionConfig::default();
@@ -2959,6 +2997,7 @@ mod tests {
             vec![None, None],
             plan,
             Arc::clone(&schema),
+            None,
         )?);
 
         let batch_size = 2;

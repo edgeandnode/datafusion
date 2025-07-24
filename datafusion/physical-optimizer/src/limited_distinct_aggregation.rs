@@ -61,6 +61,7 @@ impl LimitedDistinctAggregation {
             aggr.filter_expr().to_vec(),
             aggr.input().to_owned(),
             aggr.input_schema(),
+            aggr.initial_state().clone(),
         )
         .expect("Unable to copy Aggregate!")
         .with_limit(Some(limit));

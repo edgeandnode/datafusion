@@ -98,6 +98,7 @@ impl PhysicalOptimizerRule for CombinePartialFinalAggregate {
                     input_agg_exec.filter_expr().to_vec(),
                     Arc::clone(input_agg_exec.input()),
                     input_agg_exec.input_schema(),
+                    agg_exec.initial_state().clone(),
                 )
                 .map(|combined_agg| combined_agg.with_limit(agg_exec.limit()))
                 .ok()

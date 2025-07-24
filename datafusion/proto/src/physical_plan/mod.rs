@@ -1139,6 +1139,7 @@ impl protobuf::PhysicalPlanNode {
             physical_filter_expr,
             input,
             physical_schema,
+            None,
         )?;
 
         let agg = agg.with_limit(limit);

@@ -30,11 +30,11 @@ use datafusion_expr::EmitTo;
 
 pub(crate) mod multi_group_by;
 
-mod row;
+pub(crate) mod row;
 mod single_group_by;
 use datafusion_physical_expr::binary_map::OutputType;
 use multi_group_by::GroupValuesColumn;
-use row::GroupValuesRows;
+pub(crate) use row::GroupValuesRows;
 
 pub(crate) use single_group_by::primitive::HashValue;
 

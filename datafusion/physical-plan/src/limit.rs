@@ -799,6 +799,7 @@ mod tests {
             vec![],
             Arc::clone(&csv),
             Arc::clone(&csv.schema()),
+            None,
         )?;
         let agg_exec: Arc<dyn ExecutionPlan> = Arc::new(agg);
 
